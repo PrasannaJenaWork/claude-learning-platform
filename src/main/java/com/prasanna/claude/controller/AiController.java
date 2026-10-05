@@ -1,5 +1,6 @@
 package com.prasanna.claude.controller;
 
+import com.prasanna.claude.model.ChatRequest;
 import com.prasanna.claude.service.AiService;
 import org.springframework.web.bind.annotation.*;
 
@@ -16,9 +17,12 @@ public class AiController {
     }
 
     @PostMapping("/chat")
-    public Map<String, String> chat(@RequestBody Map<String, String> request) {
+    public Map<String, String> chat(@RequestBody ChatRequest request) {
 
-        String answer = aiService.chat(request.get("prompt"));
+        String answer = aiService.chat(
+                request.conversationId(),
+                request.prompt()
+        );
 
         return Map.of("answer", answer);
     }

@@ -12,6 +12,7 @@ import org.springframework.web.client.RestClient;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 public class AiService {
@@ -20,27 +21,32 @@ public class AiService {
     private final OllamaProperties properties;
     private static final Logger log =
             LoggerFactory.getLogger(AiService.class);
-    private final List<OllamaMessage> conversation = new ArrayList<>();
+    private final Map<String, List<OllamaMessage>> conversations =
+            new ConcurrentHashMap<>();
 
     public AiService(OllamaProperties ollamaProperties) {
         this.properties = ollamaProperties;
         this.restClient = RestClient.builder()
                 .baseUrl(ollamaProperties.baseUrl())
                 .build();
-
-        conversation.add(
-                new OllamaMessage(
-                        "system",
-                        """
-                        You are a senior cloud and software architecture assistant.
-                        Give technically accurate and concise answers.
-                        When explaining architecture decisions, explain the trade-offs.
-                        """
-                )
-        );
     }
 
-    public String chat(String prompt) {
+    public String chat(String conversationId, String prompt) {
+        List<OllamaMessage> conversation =
+                conversations.computeIfAbsent(
+                        conversationId,
+                        id -> new ArrayList<>(List.of(
+                                new OllamaMessage(
+                                        "system",
+                                        """
+                                        You are a senior cloud and software architecture assistant.
+                                        Give technically accurate and concise answers.
+                                        When explaining architecture decisions, explain the trade-offs.
+                                        """
+                                )
+                        ))
+                );
+
         conversation.add(
                 new OllamaMessage("user", prompt)
         );
@@ -51,9 +57,12 @@ public class AiService {
                 false
         );
 
-        log.info("Sending request to Ollama: model={}, messages={}",
+        log.info(
+                "Sending request to Ollama: conversationId={}, model={}, messages={}",
+                conversationId,
                 properties.model(),
-                request.messages());
+                request.messages()
+        );
 
         var response = restClient.post()
                 .uri("/api/chat")
@@ -67,12 +76,7 @@ public class AiService {
             );
         }
 
-        conversation.add(
-                new OllamaMessage(
-                        "assistant",
-                        response.message().content()
-                )
-        );
+        conversation.add(response.message());
 
         return response.message().content();
     }
