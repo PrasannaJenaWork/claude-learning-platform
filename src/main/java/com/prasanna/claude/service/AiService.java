@@ -23,6 +23,7 @@ public class AiService {
             LoggerFactory.getLogger(AiService.class);
     private final Map<String, List<OllamaMessage>> conversations =
             new ConcurrentHashMap<>();
+    private static final int MAX_HISTORY_MESSAGES = 6;
 
     public AiService(OllamaProperties ollamaProperties) {
         this.properties = ollamaProperties;
@@ -69,6 +70,21 @@ public class AiService {
                 .body(request)
                 .retrieve()
                 .body(OllamaChatResponse.class);
+
+        int inputTokens = response.promptEvalCount() != null
+                ? response.promptEvalCount()
+                : 0;
+
+        int outputTokens = response.evalCount() != null
+                ? response.evalCount()
+                : 0;
+
+        log.info(
+                "Token usage: input={}, output={}, total={}",
+                inputTokens,
+                outputTokens,
+                inputTokens + outputTokens
+        );
 
         if (response == null || response.message() == null) {
             throw new IllegalStateException(
